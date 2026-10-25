@@ -1,0 +1,33 @@
+name: Build Dylib
+on: [push]
+jobs:
+  build:
+    runs-on: macos-latest
+    steps:
+    - uses: actions/checkout@v3
+    - name: Install Theos
+      run: |
+        git clone --recursive https://github.com/theos/theos.git $HOME/theos
+        echo "THEOS=$HOME/theos" >> $GITHUB_ENV
+    - name: Compile
+      run: |
+        $HOME/theos/bin/nic.pl > /dev/null 2>&1 <<EOF
+        13
+        oxide
+        com.r.bypass
+        oxide
+        oxide
+        EOF
+        mkdir -p layout/Library/MobileSubstrate/DynamicLibraries/
+        cp Bypass.xm oxide/
+        echo "TWEAK_NAME = oxide" > oxide/Makefile
+        echo "oxide_FILES = Bypass.xm" >> oxide/Makefile
+        echo "ARCHS = arm64 arm64e" >> oxide/Makefile
+        echo "TARGET = iphone:clang:latest:14.0" >> oxide/Makefile
+        cd oxide && make package
+        find . -name "*.dylib" -exec cp {} ../layout/Library/MobileSubstrate/DynamicLibraries/ \;
+    - name: Upload Artifact
+      uses: actions/upload-artifact@v3
+      with:
+        name: Bypass-Dylib
+        path: layout/Library/MobileSubstrate/DynamicLibraries/*.dylib
